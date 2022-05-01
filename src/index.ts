@@ -2,6 +2,8 @@ enum TokenType {
     INTEGER = 'INTEGER',
     PLUS = 'PLUS',
     MINUS = 'MINUS',
+    MUL = 'MUL',
+    DIVIDE = 'DIVIDE',
     EOF = 'EOF'
 }
 
@@ -81,6 +83,16 @@ class Interpreter {
                 return new Token(TokenType.MINUS, '-');
             }
 
+            if (this.currentChar === '*') {
+                this.advance();
+                return new Token(TokenType.MUL, '*');
+            }
+
+            if (this.currentChar === '/') {
+                this.advance();
+                return new Token(TokenType.DIVIDE, '/');
+            }
+
             this.raiseError();
         }
 
@@ -95,10 +107,28 @@ class Interpreter {
         }
     }
 
-    term() {
+    factor() {
         let token = this.currentToken;
         this.eat(TokenType.INTEGER);
         return token.value;
+    }
+
+    term() {
+        let result = this.factor();
+
+        while ([TokenType.MUL, TokenType.DIVIDE].includes(this.currentToken.type)) {
+            let token = this.currentToken;
+            if (token.type === TokenType.MUL) {
+                this.eat(TokenType.MUL);
+                result = result as number * (this.factor() as number);
+            }
+            if (token.type === TokenType.DIVIDE) {
+                this.eat(TokenType.DIVIDE);
+                result = result as number / (this.factor() as number); 
+            }
+        }
+
+        return result;
     }
 
     expr() {
