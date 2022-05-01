@@ -4,6 +4,8 @@ enum TokenType {
     MINUS = 'MINUS',
     MUL = 'MUL',
     DIVIDE = 'DIVIDE',
+    LPAREN = 'LPAREN',
+    RPAREN = 'RPAREN',
     EOF = 'EOF'
 }
 
@@ -21,21 +23,19 @@ class Token {
     }
 }
 
-class Interpreter {
+class Lexer {
     private text: string;
     private pos: number;
-    private currentToken: Token | null;
     private currentChar: string | undefined;
 
     constructor(text: string) {
         this.text = text;
         this.pos = 0;
-        this.currentToken = null;
         this.currentChar = this.text[this.pos];
     }
 
     raiseError() {
-        throw new Error('Error parsing input')
+        throw new Error('Invalid character');
     }
 
     advance() {
@@ -72,6 +72,16 @@ class Interpreter {
             if (!isNaN(parseFloat(this.currentChar))) {
                 return new Token(TokenType.INTEGER, this.integer());
             }
+
+            if (this.currentChar === '(') {
+                this.advance();
+                return new Token(TokenType.LPAREN, '(');
+            }
+
+            if (this.currentChar === ')') {
+                this.advance();
+                return new Token(TokenType.RPAREN, ')');
+            }
     
             if (this.currentChar === '+') {
                 this.advance();
@@ -98,10 +108,24 @@ class Interpreter {
 
         return new Token(TokenType.EOF, undefined);
     }
+}
+
+class Interpreter {
+    private lexer: Lexer;
+    private currentToken: Token | null;
+
+    constructor(lexer: Lexer) {
+        this.lexer = lexer;
+        this.currentToken = lexer.nextToken();
+    }
+
+    raiseError() {
+        throw new Error('Invalid syntax');
+    }
 
     eat(tokenType: TokenType) {
         if (this.currentToken.type === tokenType) {
-            this.currentToken = this.nextToken();
+            this.currentToken = this.lexer.nextToken();
         } else {
             this.raiseError();
         }
@@ -109,8 +133,16 @@ class Interpreter {
 
     factor() {
         let token = this.currentToken;
-        this.eat(TokenType.INTEGER);
-        return token.value;
+        if (token.type === TokenType.INTEGER) {
+            this.eat(TokenType.INTEGER);
+            return token.value;
+        }
+        if (token.type === TokenType.LPAREN) {
+            this.eat(TokenType.LPAREN);
+            let result = this.expr();
+            this.eat(TokenType.RPAREN);
+            return result;
+        }
     }
 
     term() {
@@ -132,8 +164,6 @@ class Interpreter {
     }
 
     expr() {
-        this.currentToken = this.nextToken();
-
         let result = this.term();
 
         while ([TokenType.MINUS, TokenType.PLUS].includes(this.currentToken.type)) {
@@ -148,13 +178,14 @@ class Interpreter {
             }
         }
 
-        return result;
+        return result as number;
     }
 }
 
 function main() {
     let input = process.argv.slice(2).join('');
-    let interpreter = new Interpreter(input);
+    let lexer = new Lexer(input);
+    let interpreter = new Interpreter(lexer);
     console.log(interpreter.expr());
 }
 
