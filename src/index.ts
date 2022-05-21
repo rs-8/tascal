@@ -110,7 +110,35 @@ class Lexer {
     }
 }
 
-class Interpreter {
+class AST {}
+
+class BinOp extends AST {
+    left: AST;
+    token: Token;
+    op: Token;
+    right: AST;
+
+    constructor(left: AST, op: Token, right: AST) {
+        super();
+        this.left = left;
+        this.token = op;
+        this.op = op;
+        this.right = right;
+    }
+}
+
+class Num extends AST {
+    token: Token;
+    value: number;
+
+    constructor(token: Token) {
+        super();
+        this.token = token;
+        this.value = token.value as number;
+    }
+}
+
+class Parser {
     private lexer: Lexer;
     private currentToken: Token | null;
 
@@ -135,7 +163,7 @@ class Interpreter {
         let token = this.currentToken;
         if (token.type === TokenType.INTEGER) {
             this.eat(TokenType.INTEGER);
-            return token.value;
+            return new Num(token);
         }
         if (token.type === TokenType.LPAREN) {
             this.eat(TokenType.LPAREN);
@@ -146,47 +174,91 @@ class Interpreter {
     }
 
     term() {
-        let result = this.factor();
+        let node = this.factor();
 
         while ([TokenType.MUL, TokenType.DIVIDE].includes(this.currentToken.type)) {
             let token = this.currentToken;
             if (token.type === TokenType.MUL) {
                 this.eat(TokenType.MUL);
-                result = result as number * (this.factor() as number);
             }
             if (token.type === TokenType.DIVIDE) {
                 this.eat(TokenType.DIVIDE);
-                result = result as number / (this.factor() as number); 
             }
+            node = new BinOp(node, token, this.factor());
         }
 
-        return result;
+        return node;
     }
 
     expr() {
-        let result = this.term();
+        let node = this.term();
 
         while ([TokenType.MINUS, TokenType.PLUS].includes(this.currentToken.type)) {
             let token = this.currentToken;
             if (token.type === TokenType.MINUS) {
                 this.eat(TokenType.MINUS);
-                result = result as number - (this.term() as number);
             }
             if (token.type === TokenType.PLUS) {
                 this.eat(TokenType.PLUS);
-                result = result as number + (this.term() as number);
             }
+            node = new BinOp(node, token, this.term());
         }
 
-        return result as number;
+        return node;
+    }
+
+    parse() {
+        return this.expr();
+    }
+}
+
+class Interpreter {
+    parser: Parser;
+
+    constructor(parser: Parser) {
+        this.parser = parser;
+    }
+
+    visitBinOp(node: BinOp) {
+        if (node.op.type === TokenType.PLUS) {
+            return this.visit(node.left) + this.visit(node.right);
+        }
+        if (node.op.type === TokenType.MINUS) {
+            return this.visit(node.left) - this.visit(node.right);
+        }
+        if (node.op.type === TokenType.MUL) {
+            return this.visit(node.left) * this.visit(node.right);
+        }
+        if (node.op.type === TokenType.DIVIDE) {
+            return this.visit(node.left) / this.visit(node.right);
+        }
+    }
+
+    visitNum(node: Num) {
+        return node.value;
+    }
+
+    visit(node: AST) {
+        if (node instanceof BinOp) {
+            return this.visitBinOp(node);
+        }
+        if (node instanceof Num) {
+            return this.visitNum(node);
+        }
+    }
+
+    interpret() {
+        let tree = this.parser.parse();
+        return this.visit(tree);
     }
 }
 
 function main() {
     let input = process.argv.slice(2).join('');
     let lexer = new Lexer(input);
-    let interpreter = new Interpreter(lexer);
-    console.log(interpreter.expr());
+    let parser = new Parser(lexer);
+    let interpreter = new Interpreter(parser);
+    console.log(interpreter.interpret());
 }
 
 main();
