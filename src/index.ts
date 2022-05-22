@@ -112,6 +112,17 @@ class Lexer {
 
 class AST {}
 
+class UnaryOp extends AST {
+    op: Token;
+    expr: AST;
+
+    constructor(op: Token, expr: AST) {
+        super();
+        this.op = op;
+        this.expr = expr;
+    }
+}
+
 class BinOp extends AST {
     left: AST;
     token: Token;
@@ -161,6 +172,15 @@ class Parser {
 
     factor() {
         let token = this.currentToken;
+
+        if (token.type === TokenType.PLUS) {
+            this.eat(TokenType.PLUS);
+            return new UnaryOp(token, this.factor());
+        }
+        if (token.type === TokenType.MINUS) {
+            this.eat(TokenType.MINUS);
+            return new UnaryOp(token, this.factor());
+        }
         if (token.type === TokenType.INTEGER) {
             this.eat(TokenType.INTEGER);
             return new Num(token);
@@ -219,6 +239,15 @@ class Interpreter {
         this.parser = parser;
     }
 
+    visitUnaryOp(node: UnaryOp) {
+        if (node.op.type === TokenType.PLUS) {
+            return +this.visit(node.expr);
+        }
+        if (node.op.type === TokenType.MINUS) {
+            return -this.visit(node.expr);
+        }
+    }
+
     visitBinOp(node: BinOp) {
         if (node.op.type === TokenType.PLUS) {
             return this.visit(node.left) + this.visit(node.right);
@@ -239,6 +268,9 @@ class Interpreter {
     }
 
     visit(node: AST) {
+        if (node instanceof UnaryOp) {
+            return this.visitUnaryOp(node);
+        }
         if (node instanceof BinOp) {
             return this.visitBinOp(node);
         }
